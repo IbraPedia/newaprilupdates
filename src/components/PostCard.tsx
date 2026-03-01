@@ -17,6 +17,7 @@ interface Post {
   likes_count: number;
   comments_count: number;
   user_liked: boolean;
+  image_urls?: string[];
 }
 
 interface Comment {
@@ -138,6 +139,20 @@ const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-foreground/90 whitespace-pre-wrap">{post.content}</p>
+
+        {post.image_urls && post.image_urls.length > 0 && (
+          <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {post.image_urls.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                alt=""
+                className="w-full rounded-lg object-cover max-h-64 border"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-1 pt-2 border-t">
           <Button

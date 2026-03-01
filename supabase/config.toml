@@ -1,1 +1,5 @@
 project_id = "xzcfrrywsqswdulacpem"
+
+[auth]
+site_url = "http://localhost:5173"
+jwt_expiry = 2592000

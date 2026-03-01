@@ -36,6 +36,7 @@ const PostDetail = () => {
     setPost({
       ...data,
       author: data.author,
+      image_urls: (data as any).image_urls || [],
       likes_count: likesData?.length || 0,
       comments_count: commentsData?.length || 0,
       user_liked: user ? likesData?.some(l => l.user_id === user.id) || false : false,
