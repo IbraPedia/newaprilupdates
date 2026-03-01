@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -13,19 +14,22 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, ImagePlus, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { CATEGORIES } from '@/lib/categories';
 
 interface Props {
   onPostCreated: () => void;
+  defaultCategory?: string;
 }
 
 const MAX_CHARS = 25000;
 const MAX_IMAGES = 4;
 
-const CreatePostDialog = ({ onPostCreated }: Props) => {
+const CreatePostDialog = ({ onPostCreated, defaultCategory }: Props) => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [category, setCategory] = useState(defaultCategory || '');
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -68,6 +72,10 @@ const CreatePostDialog = ({ onPostCreated }: Props) => {
       toast.error('Please fill in both title and content');
       return;
     }
+    if (!category) {
+      toast.error('Please select a category');
+      return;
+    }
     if (content.length > MAX_CHARS) {
       toast.error(`Content must be under ${MAX_CHARS.toLocaleString()} characters`);
       return;
@@ -83,11 +91,13 @@ const CreatePostDialog = ({ onPostCreated }: Props) => {
         content: content.trim(),
         author_id: user!.id,
         image_urls: imageUrls,
+        category,
       });
       if (error) throw error;
       toast.success('Post published!');
       setTitle('');
       setContent('');
+      setCategory(defaultCategory || '');
       setImages([]);
       previews.forEach((p) => URL.revokeObjectURL(p));
       setPreviews([]);
@@ -118,6 +128,18 @@ const CreatePostDialog = ({ onPostCreated }: Props) => {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
+
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a category" />
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORIES.map(cat => (
+                <SelectItem key={cat.slug} value={cat.slug}>{cat.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <div className="space-y-1">
             <Textarea
               placeholder="What's on your mind?"
@@ -131,7 +153,6 @@ const CreatePostDialog = ({ onPostCreated }: Props) => {
             </p>
           </div>
 
-          {/* Image previews */}
           {previews.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
               {previews.map((src, i) => (

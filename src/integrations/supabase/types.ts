@@ -14,6 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      bookmarks: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookmarks_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comments: {
         Row: {
           author_id: string
@@ -154,6 +183,7 @@ export type Database = {
       posts: {
         Row: {
           author_id: string
+          category: string
           content: string
           created_at: string
           id: string
@@ -163,6 +193,7 @@ export type Database = {
         }
         Insert: {
           author_id: string
+          category?: string
           content: string
           created_at?: string
           id?: string
@@ -172,6 +203,7 @@ export type Database = {
         }
         Update: {
           author_id?: string
+          category?: string
           content?: string
           created_at?: string
           id?: string
@@ -191,21 +223,30 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age: number | null
           avatar_url: string | null
           created_at: string
+          gender: string | null
           id: string
+          location: string | null
           username: string
         }
         Insert: {
+          age?: number | null
           avatar_url?: string | null
           created_at?: string
+          gender?: string | null
           id: string
+          location?: string | null
           username: string
         }
         Update: {
+          age?: number | null
           avatar_url?: string | null
           created_at?: string
+          gender?: string | null
           id?: string
+          location?: string | null
           username?: string
         }
         Relationships: []
