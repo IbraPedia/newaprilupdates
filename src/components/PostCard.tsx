@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useMediaUrls } from '@/hooks/useMediaUrls';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,6 +40,7 @@ const canEdit = (createdAt: string) => {
 
 const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
   const { user } = useAuth();
+  const { urls: mediaUrls } = useMediaUrls(post.image_urls);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -238,13 +240,27 @@ const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
         )}
       </CardHeader>
       <CardContent className="space-y-3">
-        {!editingPost && <p className="text-foreground/90 whitespace-pre-wrap">{post.content}</p>}
+        {!editingPost && (
+          <p className="text-foreground/90 whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{
+              __html: post.content
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            }}
+          />
+        )}
 
-        {post.image_urls && post.image_urls.length > 0 && (
-          <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {post.image_urls.map((url, i) => (
-              <img key={i} src={url} alt="" className="w-full rounded-lg object-cover max-h-64 border" loading="lazy" />
-            ))}
+        {mediaUrls.length > 0 && (
+          <div className={`grid gap-2 ${mediaUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {mediaUrls.map((url, i) => {
+              const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
+              return isVideo ? (
+                <video key={i} src={url} controls className="w-full rounded-lg max-h-64 border" />
+              ) : (
+                <img key={i} src={url} alt="" className="w-full rounded-lg object-cover max-h-64 border" loading="lazy" />
+              );
+            })}
           </div>
         )}
 

@@ -3,3 +3,6 @@ project_id = "xzcfrrywsqswdulacpem"
 [auth]
 site_url = "http://localhost:5173"
 jwt_expiry = 2592000
+
+[functions.r2-upload]
+verify_jwt = false

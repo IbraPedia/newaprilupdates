@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { uploadToR2, compressImage } from '@/lib/r2Upload';
 import Navbar from '@/components/Navbar';
 import PostCard from '@/components/PostCard';
 import { Button } from '@/components/ui/button';
@@ -98,11 +99,10 @@ const Profile = () => {
     try {
       let avatar_url = profile?.avatar_url;
       if (avatarFile) {
-        const ext = avatarFile.name.split('.').pop();
-        const path = `${user!.id}/avatar.${ext}`;
-        await supabase.storage.from('post-images').upload(path, avatarFile, { upsert: true });
-        const { data } = supabase.storage.from('post-images').getPublicUrl(path);
-        avatar_url = data.publicUrl;
+        const compressed = await compressImage(avatarFile);
+        const key = await uploadToR2(compressed);
+        // Store key as avatar_url - it'll be resolved by the app
+        avatar_url = key;
       }
       const { error } = await supabase.from('profiles').update({
         username: form.username.trim(),
