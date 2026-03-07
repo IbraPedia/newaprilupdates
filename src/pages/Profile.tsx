@@ -36,6 +36,7 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ username: '', first_name: '', last_name: '', location: '', gender: '', age: '' });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const isOwnProfile = user?.id === id;
@@ -67,7 +68,7 @@ const Profile = () => {
     if (!id) return;
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(id, username)')
+      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified, avatar_url)')
       .eq('author_id', id)
       .order('created_at', { ascending: false });
 
@@ -80,6 +81,7 @@ const Profile = () => {
     const enriched = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,
       author: p.author, image_urls: p.image_urls || [], category: p.category,
+      status: p.status,
       likes_count: likesData?.filter(l => l.post_id === p.id).length || 0,
       comments_count: commentsData?.filter(c => c.post_id === p.id).length || 0,
       user_liked: user ? likesData?.some(l => l.post_id === p.id && l.user_id === user.id) || false : false,
@@ -92,6 +94,15 @@ const Profile = () => {
     if (user) { fetchProfile(); fetchPosts(); }
   }, [id, user]);
 
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error('Avatar must be under 5MB'); return; }
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
   const handleSave = async () => {
     const usernameError = validateUsername(form.username);
     if (usernameError) { toast.error(usernameError); return; }
@@ -101,7 +112,7 @@ const Profile = () => {
       let avatar_url = profile?.avatar_url;
       if (avatarFile) {
         const compressed = await compressImage(avatarFile);
-        avatar_url = await uploadFile(compressed);
+        avatar_url = await uploadFile(compressed, 'avatars');
       }
       const { error } = await supabase.from('profiles').update({
         username: form.username.trim(),
@@ -116,17 +127,22 @@ const Profile = () => {
       toast.success('Profile updated!');
       setEditing(false);
       setAvatarFile(null);
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      setAvatarPreview(null);
       fetchProfile();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update profile');
+      if (err.message?.includes('profiles_username_unique')) {
+        toast.error('This username is already taken. Please choose another.');
+      } else {
+        toast.error(err.message || 'Failed to update profile');
+      }
     } finally { setSaving(false); }
   };
 
   if (!user) return null;
 
   if (loading && !profile) return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
+    <div className="min-h-screen bg-background"><Navbar />
       <main className="container mx-auto max-w-2xl px-4 py-6">
         <p className="text-center text-muted-foreground">Loading...</p>
       </main>
@@ -145,7 +161,7 @@ const Profile = () => {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={profile.avatar_url || undefined} />
+                    <AvatarImage src={avatarPreview || profile.avatar_url || undefined} />
                     <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
                       {profile.username.charAt(0).toUpperCase()}
                     </AvatarFallback>
@@ -176,7 +192,7 @@ const Profile = () => {
                   </div>
                   <div>
                     <Input placeholder="Username (6-20 characters)" value={form.username} onChange={e => setForm({...form, username: e.target.value})} maxLength={20} />
-                    <p className="text-xs text-muted-foreground mt-1">Letters, numbers, and _ only. 6-20 characters.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Letters, numbers, and _ only. 6-20 characters. Must be unique.</p>
                   </div>
                   <Input placeholder="Location (e.g. Dar es Salaam)" value={form.location} onChange={e => setForm({...form, location: e.target.value})} />
                   <Select value={form.gender} onValueChange={v => setForm({...form, gender: v})}>
@@ -189,13 +205,13 @@ const Profile = () => {
                   <Input type="number" placeholder="Age" value={form.age} onChange={e => setForm({...form, age: e.target.value})} min={1} max={120} />
                   <div>
                     <label className="text-sm font-medium">Profile Photo</label>
-                    <Input type="file" accept="image/*" onChange={e => setAvatarFile(e.target.files?.[0] || null)} className="mt-1" />
+                    <Input type="file" accept="image/*" onChange={handleAvatarSelect} className="mt-1" />
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={handleSave} disabled={saving} className="gap-1.5">
                       <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save'}
                     </Button>
-                    <Button variant="outline" onClick={() => { setEditing(false); setAvatarFile(null); }} className="gap-1.5">
+                    <Button variant="outline" onClick={() => { setEditing(false); setAvatarFile(null); if (avatarPreview) URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }} className="gap-1.5">
                       <X className="h-4 w-4" /> Cancel
                     </Button>
                   </div>

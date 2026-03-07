@@ -9,47 +9,48 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Heart, MessageCircle, Share2, Send, Bookmark, BookmarkCheck, Pencil, Trash2, X, Check, Flag, Reply, ImagePlus, Video, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { CATEGORIES } from '@/lib/categories';
+import MediaViewer from '@/components/MediaViewer';
 
 interface Post {
   id: string;
   title: string;
   content: string;
   created_at: string;
-  author: { id: string; username: string; is_verified?: boolean };
+  author: { id: string; username: string; is_verified?: boolean; avatar_url?: string | null };
   likes_count: number;
   comments_count: number;
   user_liked: boolean;
   image_urls?: string[];
   category?: string;
+  status?: string;
 }
 
 interface Comment {
   id: string;
   content: string;
   created_at: string;
-  author: { id: string; username: string; is_verified?: boolean };
+  author: { id: string; username: string; is_verified?: boolean; avatar_url?: string | null };
   parent_comment_id: string | null;
   media_url: string | null;
+  status?: string;
 }
 
 const PREVIEW_LENGTH = 200;
 const MAX_COMMENT_CHARS = 1000;
 
-const canEditTime = (createdAt: string) => {
-  return (Date.now() - new Date(createdAt).getTime()) < 12 * 60 * 60 * 1000;
-};
-
-const canDeleteTime = (createdAt: string) => {
-  return (Date.now() - new Date(createdAt).getTime()) < 48 * 60 * 60 * 1000;
-};
+const canEditTime = (createdAt: string) => (Date.now() - new Date(createdAt).getTime()) < 12 * 60 * 60 * 1000;
+const canDeleteTime = (createdAt: string) => (Date.now() - new Date(createdAt).getTime()) < 48 * 60 * 60 * 1000;
 
 const VerifiedBadge = () => (
   <BadgeCheck className="h-4 w-4 text-blue-500 inline-block ml-0.5 shrink-0" />
 );
+
+const isMediaVideo = (url: string) => url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
 
 const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }: { post: Post; onUpdate: () => void; expanded?: boolean; autoShowComments?: boolean }) => {
   const { user } = useAuth();
@@ -70,10 +71,12 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   const [commentMedia, setCommentMedia] = useState<File | null>(null);
   const [commentMediaPreview, setCommentMediaPreview] = useState<string | null>(null);
   const commentFileRef = useRef<HTMLInputElement>(null);
+  const [viewerMedia, setViewerMedia] = useState<{ url: string; isVideo: boolean } | null>(null);
 
   const categoryInfo = CATEGORIES.find(c => c.slug === post.category);
   const isAuthor = user?.id === post.author.id;
   const needsTruncation = !expanded && post.content.length > PREVIEW_LENGTH;
+  const isPending = post.status === 'pending';
 
   useEffect(() => {
     if (user) {
@@ -85,7 +88,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   const fetchComments = async () => {
     const { data } = await supabase
       .from('comments')
-      .select('*, author:profiles!comments_author_id_fkey(id, username, is_verified)')
+      .select('*, author:profiles!comments_author_id_fkey(id, username, is_verified, avatar_url)')
       .eq('post_id', post.id)
       .order('created_at', { ascending: false });
     if (data) setComments(data as any);
@@ -103,9 +106,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
       } else {
         await supabase.from('likes').insert({ post_id: post.id, user_id: user.id });
         if (post.author.id !== user.id) {
-          await supabase.from('notifications').insert({
-            user_id: post.author.id, type: 'like', actor_id: user.id, post_id: post.id,
-          });
+          await supabase.from('notifications').insert({ user_id: post.author.id, type: 'like', actor_id: user.id, post_id: post.id });
         }
       }
       onUpdate();
@@ -121,10 +122,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   const handleCommentMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error('File must be under 50MB');
-      return;
-    }
+    if (file.size > 50 * 1024 * 1024) { toast.error('File must be under 50MB'); return; }
     removeCommentMedia();
     setCommentMedia(file);
     setCommentMediaPreview(URL.createObjectURL(file));
@@ -147,18 +145,17 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
         }
       }
 
+      const hasMedia = !!media_url;
       const insertData: any = {
         post_id: post.id,
         author_id: user.id,
         content: newComment.trim(),
         media_url,
+        status: hasMedia ? 'pending' : 'approved',
       };
       if (replyToId) insertData.parent_comment_id = replyToId;
 
-      const { data, error } = await supabase
-        .from('comments')
-        .insert(insertData)
-        .select('id').single();
+      const { data, error } = await supabase.from('comments').insert(insertData).select('id').single();
       if (error) throw error;
       if (post.author.id !== user.id) {
         await supabase.from('notifications').insert({
@@ -171,6 +168,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
       removeCommentMedia();
       fetchComments();
       onUpdate();
+      if (hasMedia) toast.info('Your comment with media is pending admin approval.');
     } catch { toast.error('Failed to post comment'); }
     finally { setLoadingComment(false); }
   };
@@ -186,12 +184,10 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     try {
       if (bookmarked) {
         await supabase.from('bookmarks').delete().eq('user_id', user.id).eq('post_id', post.id);
-        setBookmarked(false);
-        toast.success('Bookmark removed');
+        setBookmarked(false); toast.success('Bookmark removed');
       } else {
         await supabase.from('bookmarks').insert({ user_id: user.id, post_id: post.id });
-        setBookmarked(true);
-        toast.success('Post bookmarked!');
+        setBookmarked(true); toast.success('Post bookmarked!');
       }
     } catch { toast.error('Failed to update bookmark'); }
   };
@@ -201,21 +197,16 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     try {
       const { error } = await supabase.from('posts').delete().eq('id', post.id);
       if (error) throw error;
-      toast.success('Post deleted');
-      onUpdate();
+      toast.success('Post deleted'); onUpdate();
     } catch { toast.error('Failed to delete post'); }
   };
 
   const handleSavePostEdit = async () => {
     if (!editTitle.trim() || !editContent.trim()) { toast.error('Title and content required'); return; }
     try {
-      const { error } = await supabase.from('posts').update({
-        title: editTitle.trim(), content: editContent.trim(),
-      }).eq('id', post.id);
+      const { error } = await supabase.from('posts').update({ title: editTitle.trim(), content: editContent.trim() }).eq('id', post.id);
       if (error) throw error;
-      toast.success('Post updated');
-      setEditingPost(false);
-      onUpdate();
+      toast.success('Post updated'); setEditingPost(false); onUpdate();
     } catch { toast.error('Failed to update post'); }
   };
 
@@ -223,9 +214,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     if (!confirm('Delete this comment?')) return;
     try {
       await supabase.from('comments').delete().eq('id', commentId);
-      toast.success('Comment deleted');
-      fetchComments();
-      onUpdate();
+      toast.success('Comment deleted'); fetchComments(); onUpdate();
     } catch { toast.error('Failed to delete comment'); }
   };
 
@@ -235,9 +224,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     try {
       const { error } = await supabase.from('comments').update({ content: editCommentContent.trim() }).eq('id', commentId);
       if (error) throw error;
-      toast.success('Comment updated');
-      setEditingCommentId(null);
-      fetchComments();
+      toast.success('Comment updated'); setEditingCommentId(null); fetchComments();
     } catch { toast.error('Failed to update comment'); }
   };
 
@@ -246,9 +233,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     const reason = prompt('Why are you reporting this post?');
     if (!reason?.trim()) return;
     try {
-      const { error } = await supabase.from('reports').insert({
-        reporter_id: user.id, post_id: post.id, reason: reason.trim(),
-      });
+      const { error } = await supabase.from('reports').insert({ reporter_id: user.id, post_id: post.id, reason: reason.trim() });
       if (error) throw error;
       toast.success('Report submitted. Thank you.');
     } catch { toast.error('Failed to submit report'); }
@@ -259,9 +244,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     const reason = prompt('Why are you reporting this comment?');
     if (!reason?.trim()) return;
     try {
-      const { error } = await supabase.from('reports').insert({
-        reporter_id: user.id, comment_id: commentId, reason: reason.trim(),
-      });
+      const { error } = await supabase.from('reports').insert({ reporter_id: user.id, comment_id: commentId, reason: reason.trim() });
       if (error) throw error;
       toast.success('Report submitted. Thank you.');
     } catch { toast.error('Failed to submit report'); }
@@ -272,24 +255,26 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
 
   const renderContent = () => {
     const raw = needsTruncation ? post.content.slice(0, PREVIEW_LENGTH) + '…' : post.content;
-    const html = raw
+    return raw
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>');
-    return html;
   };
 
   // Build threaded comments
   const topLevelComments = comments.filter(c => !c.parent_comment_id);
   const getReplies = (parentId: string) => comments.filter(c => c.parent_comment_id === parentId);
 
-  const isMediaVideo = (url: string) => url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
-
   const authorDisplay = (
     <div className="flex items-center gap-2">
       {user ? (
-        <Link to={`/profile/${post.author.id}`} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm hover:opacity-80">
-          {post.author.username.charAt(0).toUpperCase()}
+        <Link to={`/profile/${post.author.id}`}>
+          <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-primary transition-all">
+            <AvatarImage src={post.author.avatar_url || undefined} />
+            <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
+              {post.author.username.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
         </Link>
       ) : (
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground font-bold text-sm">
@@ -312,101 +297,122 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     </div>
   );
 
-  const renderCommentItem = (c: Comment, isReply = false) => {
+  // Recursive comment rendering for infinite nesting
+  const renderCommentTree = (c: Comment, depth: number = 0) => {
     const isCommentAuthor = user?.id === c.author.id;
     const canEditComment = isMod || (isCommentAuthor && canEditTime(c.created_at));
     const canDeleteComment = isMod || (isCommentAuthor && canDeleteTime(c.created_at));
     const isVideo = c.media_url && isMediaVideo(c.media_url);
+    const replies = getReplies(c.id);
+    const indent = Math.min(depth, 5) * 16;
+    const commentIsPending = c.status === 'pending';
 
     return (
-      <div key={c.id} className={`flex gap-2 ${isReply ? 'ml-8' : ''}`}>
-        {user ? (
-          <Link to={`/profile/${c.author.id}`}>
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground font-bold text-xs">
+      <div key={c.id} className="space-y-2">
+        <div className="flex gap-2" style={{ marginLeft: `${indent}px` }}>
+          {user ? (
+            <Link to={`/profile/${c.author.id}`}>
+              <Avatar className="h-7 w-7 shrink-0">
+                <AvatarImage src={c.author.avatar_url || undefined} />
+                <AvatarFallback className="bg-secondary text-secondary-foreground font-bold text-xs">
+                  {c.author.username.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+          ) : (
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground font-bold text-xs">
               {c.author.username.charAt(0).toUpperCase()}
             </div>
-          </Link>
-        ) : (
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground font-bold text-xs">
-            {c.author.username.charAt(0).toUpperCase()}
-          </div>
-        )}
-        <div className="bg-muted rounded-lg px-3 py-2 flex-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-0.5">
-              {user ? (
-                <Link to={`/profile/${c.author.id}`} className="text-xs font-semibold hover:underline">{c.author.username}</Link>
-              ) : (
-                <span className="text-xs font-semibold">{c.author.username}</span>
-              )}
-              {c.author.is_verified && <BadgeCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
-            </div>
-            <div className="flex items-center gap-1">
-              {canEditComment && (
-                <button onClick={() => { setEditingCommentId(c.id); setEditCommentContent(c.content); }} className="text-muted-foreground hover:text-foreground">
-                  <Pencil className="h-3 w-3" />
-                </button>
-              )}
-              {canDeleteComment && (
-                <button onClick={() => handleDeleteComment(c.id)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              )}
-              {user && !isCommentAuthor && !isMod && (
-                <button onClick={() => handleReportComment(c.id)} className="text-muted-foreground hover:text-destructive">
-                  <Flag className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          </div>
-          {editingCommentId === c.id ? (
-            <div className="mt-1 space-y-1">
-              <Textarea value={editCommentContent} onChange={e => setEditCommentContent(e.target.value)} rows={2} className="text-sm" maxLength={MAX_COMMENT_CHARS} />
-              <p className="text-[10px] text-muted-foreground text-right">{editCommentContent.length}/{MAX_COMMENT_CHARS}</p>
-              <div className="flex gap-1">
-                <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleSaveCommentEdit(c.id)}>Save</Button>
-                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingCommentId(null)}>Cancel</Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm whitespace-pre-wrap">{c.content}</p>
-              {c.media_url && (
-                isVideo ? (
-                  <video src={c.media_url} controls className="w-full rounded max-h-48 mt-1 border" />
+          )}
+          <div className={`bg-muted rounded-lg px-3 py-2 flex-1 ${commentIsPending ? 'opacity-60 border border-dashed border-yellow-500' : ''}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-0.5">
+                {user ? (
+                  <Link to={`/profile/${c.author.id}`} className="text-xs font-semibold hover:underline">{c.author.username}</Link>
                 ) : (
-                  <img src={c.media_url} alt="" className="w-full rounded max-h-48 object-cover mt-1 border" loading="lazy" />
-                )
-              )}
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-[10px] text-muted-foreground">
-                  {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
-                </p>
-                {user && (
-                  <button
-                    onClick={() => { setReplyToId(c.id); setReplyToUsername(c.author.username); }}
-                    className="text-[11px] text-muted-foreground hover:text-primary font-medium flex items-center gap-0.5"
-                  >
-                    <Reply className="h-3 w-3" /> Reply
+                  <span className="text-xs font-semibold">{c.author.username}</span>
+                )}
+                {c.author.is_verified && <BadgeCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
+                {commentIsPending && <Badge variant="outline" className="text-[9px] ml-1 h-4 px-1 text-yellow-600">Pending</Badge>}
+              </div>
+              <div className="flex items-center gap-1">
+                {canEditComment && (
+                  <button onClick={() => { setEditingCommentId(c.id); setEditCommentContent(c.content); }} className="text-muted-foreground hover:text-foreground">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+                {canDeleteComment && (
+                  <button onClick={() => handleDeleteComment(c.id)} className="text-muted-foreground hover:text-destructive">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+                {user && !isCommentAuthor && !isMod && (
+                  <button onClick={() => handleReportComment(c.id)} className="text-muted-foreground hover:text-destructive">
+                    <Flag className="h-3 w-3" />
                   </button>
                 )}
               </div>
-            </>
-          )}
+            </div>
+            {editingCommentId === c.id ? (
+              <div className="mt-1 space-y-1">
+                <Textarea value={editCommentContent} onChange={e => setEditCommentContent(e.target.value)} rows={2} className="text-sm" maxLength={MAX_COMMENT_CHARS} />
+                <p className="text-[10px] text-muted-foreground text-right">{editCommentContent.length}/{MAX_COMMENT_CHARS}</p>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleSaveCommentEdit(c.id)}>Save</Button>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingCommentId(null)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm whitespace-pre-wrap">{c.content}</p>
+                {c.media_url && (
+                  isVideo ? (
+                    <video
+                      src={c.media_url}
+                      controls
+                      className="w-full rounded max-h-48 mt-1 border cursor-pointer"
+                      onClick={(e) => { e.preventDefault(); setViewerMedia({ url: c.media_url!, isVideo: true }); }}
+                    />
+                  ) : (
+                    <img
+                      src={c.media_url}
+                      alt=""
+                      className="w-full rounded max-h-48 object-cover mt-1 border cursor-pointer hover:opacity-90 transition-opacity"
+                      loading="lazy"
+                      onClick={() => setViewerMedia({ url: c.media_url!, isVideo: false })}
+                    />
+                  )
+                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-[10px] text-muted-foreground">
+                    {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                  </p>
+                  {user && (
+                    <button
+                      onClick={() => { setReplyToId(c.id); setReplyToUsername(c.author.username); }}
+                      className="text-[11px] text-muted-foreground hover:text-primary font-medium flex items-center gap-0.5"
+                    >
+                      <Reply className="h-3 w-3" /> Reply
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
+        {replies.map(reply => renderCommentTree(reply, depth + 1))}
       </div>
     );
   };
 
   return (
-    <Card className="shadow-card hover:shadow-card-hover transition-shadow">
+    <Card className={`shadow-card hover:shadow-card-hover transition-shadow ${isPending ? 'border-yellow-500 border-dashed' : ''}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           {authorDisplay}
           <div className="flex items-center gap-2">
-            {categoryInfo && (
-              <Badge variant="secondary" className="text-xs">{categoryInfo.label}</Badge>
-            )}
+            {isPending && <Badge variant="outline" className="text-yellow-600">Pending Approval</Badge>}
+            {categoryInfo && <Badge variant="secondary" className="text-xs">{categoryInfo.label}</Badge>}
             {(canEditPost || canDeletePost) && (
               <div className="flex items-center gap-1">
                 {canEditPost && (
@@ -439,38 +445,41 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
       <CardContent className="space-y-3">
         {!editingPost && (
           <>
-            <p className="text-foreground/90 whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: renderContent() }}
-            />
+            <p className="text-foreground/90 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderContent() }} />
             {needsTruncation && (
-              <Link to={`/post/${post.id}`} className="text-primary text-sm font-medium hover:underline">
-                Read more
-              </Link>
+              <Link to={`/post/${post.id}`} className="text-primary text-sm font-medium hover:underline">Read more</Link>
             )}
           </>
         )}
 
-        {/* Show media - always visible */}
+        {/* Media - clickable for fullscreen */}
         {post.image_urls && post.image_urls.length > 0 && (
           <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {post.image_urls.map((url, i) => {
-              return isMediaVideo(url) ? (
-                <video key={i} src={url} controls className="w-full rounded-lg max-h-64 border" />
+            {post.image_urls.map((url, i) =>
+              isMediaVideo(url) ? (
+                <video
+                  key={i} src={url} controls
+                  className="w-full rounded-lg max-h-64 border cursor-pointer"
+                  onClick={(e) => { e.preventDefault(); setViewerMedia({ url, isVideo: true }); }}
+                />
               ) : (
-                <img key={i} src={url} alt="" className="w-full rounded-lg object-cover max-h-64 border" loading="lazy" />
-              );
-            })}
+                <img
+                  key={i} src={url} alt=""
+                  className="w-full rounded-lg object-cover max-h-64 border cursor-pointer hover:opacity-90 transition-opacity"
+                  loading="lazy"
+                  onClick={() => setViewerMedia({ url, isVideo: false })}
+                />
+              )
+            )}
           </div>
         )}
 
         <div className="flex items-center gap-1 pt-2 border-t">
           <Button variant="ghost" size="sm" onClick={handleLike} className={`gap-1.5 ${post.user_liked ? 'text-destructive' : ''}`}>
-            <Heart className={`h-4 w-4 ${post.user_liked ? 'fill-current' : ''}`} />
-            {post.likes_count}
+            <Heart className={`h-4 w-4 ${post.user_liked ? 'fill-current' : ''}`} /> {post.likes_count}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setShowComments(!showComments)} className="gap-1.5">
-            <MessageCircle className="h-4 w-4" />
-            {post.comments_count}
+            <MessageCircle className="h-4 w-4" /> {post.comments_count}
           </Button>
           <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1.5">
             <Share2 className="h-4 w-4" />
@@ -491,12 +500,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
 
         {showComments && (
           <div className="space-y-3 pt-2 border-t">
-            {topLevelComments.map((c) => (
-              <div key={c.id} className="space-y-2">
-                {renderCommentItem(c)}
-                {getReplies(c.id).map(reply => renderCommentItem(reply, true))}
-              </div>
-            ))}
+            {topLevelComments.map((c) => renderCommentTree(c))}
             {user && (
               <div className="space-y-2">
                 {replyToId && (
@@ -546,6 +550,15 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
           </div>
         )}
       </CardContent>
+
+      {viewerMedia && (
+        <MediaViewer
+          open={!!viewerMedia}
+          onClose={() => setViewerMedia(null)}
+          url={viewerMedia.url}
+          isVideo={viewerMedia.isVideo}
+        />
+      )}
     </Card>
   );
 };

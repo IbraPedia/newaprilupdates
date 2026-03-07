@@ -7,19 +7,20 @@ import CreatePostDialog from '@/components/CreatePostDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, FileText, MessageSquare } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 interface PostData {
   id: string;
   title: string;
   content: string;
   created_at: string;
-  author: { id: string; username: string; is_verified?: boolean };
+  author: { id: string; username: string; is_verified?: boolean; avatar_url?: string | null };
   likes_count: number;
   comments_count: number;
   user_liked: boolean;
   image_urls?: string[];
   category?: string;
+  status?: string;
 }
 
 const POSTS_PER_PAGE = 30;
@@ -34,7 +35,7 @@ const Index = () => {
   const fetchPosts = useCallback(async () => {
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified)')
+      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified, avatar_url)')
       .order('created_at', { ascending: false });
 
     if (!postsData) { setLoading(false); return; }
@@ -47,18 +48,26 @@ const Index = () => {
     const enriched: PostData[] = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,
       author: p.author, image_urls: p.image_urls || [], category: p.category,
+      status: p.status,
       likes_count: likesData?.filter(l => l.post_id === p.id).length || 0,
       comments_count: commentsData?.filter(c => c.post_id === p.id).length || 0,
       user_liked: user ? likesData?.some(l => l.post_id === p.id && l.user_id === user.id) || false : false,
     }));
 
-    // Sort: verified authors get a boost, then by engagement + time
+    // Sorting: recent first, then engagement, verified boost for 23h only
+    const now = Date.now();
+    const VERIFIED_BOOST_MS = 23 * 60 * 60 * 1000;
+
     const sorted = [...enriched].sort((a, b) => {
-      const VERIFIED_BOOST = 7200000; // 2 hours boost in ms
-      const score = (eng: number, time: number, verified: boolean) =>
-        time + eng * 3600000 + (verified ? VERIFIED_BOOST : 0);
-      return score(b.likes_count + b.comments_count, new Date(b.created_at).getTime(), !!b.author.is_verified)
-        - score(a.likes_count + a.comments_count, new Date(a.created_at).getTime(), !!a.author.is_verified);
+      const getScore = (p: PostData) => {
+        const recency = new Date(p.created_at).getTime();
+        const engagement = (p.likes_count + p.comments_count) * 1800000; // 30min boost per interaction
+        const postAge = now - new Date(p.created_at).getTime();
+        const verifiedBoost = p.author.is_verified && postAge < VERIFIED_BOOST_MS
+          ? (VERIFIED_BOOST_MS - postAge) : 0;
+        return recency + engagement + verifiedBoost;
+      };
+      return getScore(b) - getScore(a);
     });
 
     setPosts(sorted);
@@ -70,9 +79,7 @@ const Index = () => {
   useEffect(() => {
     const channel = supabase
       .channel('public:posts')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
-        fetchPosts();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchPosts]);
@@ -85,31 +92,14 @@ const Index = () => {
   const hasMore = visibleCount < filtered.length;
 
   // Forum stats
-  const totalPosts = posts.filter(p => p.content.length <= 500).length;
-  const totalThreads = posts.filter(p => p.content.length > 500).length;
+  const approvedPosts = posts.filter(p => p.status !== 'pending');
+  const totalPosts = approvedPosts.filter(p => p.content.length <= 500).length;
+  const totalThreads = approvedPosts.filter(p => p.content.length > 500).length;
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto max-w-2xl px-4 py-6">
-        {/* Forum Stats */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-            <FileText className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-lg font-bold">{totalPosts}</p>
-              <p className="text-xs text-muted-foreground">Posts (≤500 chars)</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-            <MessageSquare className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-lg font-bold">{totalThreads}</p>
-              <p className="text-xs text-muted-foreground">Threads (500+ chars)</p>
-            </div>
-          </div>
-        </div>
-
         <div className="flex items-center justify-between mb-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -141,6 +131,18 @@ const Index = () => {
               )}
             </>
           )}
+        </div>
+
+        {/* Forum Stats Bar */}
+        <div className="mt-8 py-4 border-t text-center">
+          <p className="text-sm font-bold text-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
+            Kanisa Kiganjani Stats
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Posts <span className="font-bold text-foreground">{totalPosts}</span>
+            {' · '}
+            Threads <span className="font-bold text-foreground">{totalThreads}</span>
+          </p>
         </div>
       </main>
     </div>

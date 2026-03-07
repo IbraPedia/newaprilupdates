@@ -21,20 +21,20 @@ const CategoryFeed = () => {
     if (!slug) return;
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified)')
+      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified, avatar_url)')
       .eq('category', slug)
       .order('created_at', { ascending: false });
 
     if (!postsData) { setLoading(false); return; }
 
     const postIds = postsData.map(p => p.id);
-
     const { data: likesData } = await supabase.from('likes').select('post_id, user_id').in('post_id', postIds.length > 0 ? postIds : ['none']);
     const { data: commentsData } = await supabase.from('comments').select('post_id').in('post_id', postIds.length > 0 ? postIds : ['none']);
 
     const enriched = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,
       author: p.author, image_urls: p.image_urls || [], category: p.category,
+      status: p.status,
       likes_count: likesData?.filter(l => l.post_id === p.id).length || 0,
       comments_count: commentsData?.filter(c => c.post_id === p.id).length || 0,
       user_liked: user ? likesData?.some(l => l.post_id === p.id && l.user_id === user.id) || false : false,
@@ -49,15 +49,9 @@ const CategoryFeed = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto max-w-2xl px-4 py-6">
-        <Link to="/">
-          <Button variant="ghost" className="mb-4 gap-2">
-            <ArrowLeft className="h-4 w-4" /> Back to Feed
-          </Button>
-        </Link>
+        <Link to="/"><Button variant="ghost" className="mb-4 gap-2"><ArrowLeft className="h-4 w-4" /> Back to Feed</Button></Link>
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-            {category?.label || slug}
-          </h1>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{category?.label || slug}</h1>
           {user && <CreatePostDialog onPostCreated={fetchPosts} defaultCategory={slug} />}
         </div>
         <div className="space-y-4">

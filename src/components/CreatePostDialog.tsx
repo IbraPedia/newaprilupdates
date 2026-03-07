@@ -6,9 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, ImagePlus, Video, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES } from '@/lib/categories';
@@ -55,10 +53,7 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory }: Props) => {
     if (hasImages) { toast.error('Remove photos first to add a video'); return; }
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
-      toast.error(`Video must be under ${MAX_VIDEO_MB}MB`);
-      return;
-    }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) { toast.error(`Video must be under ${MAX_VIDEO_MB}MB`); return; }
     if (videoPreview) URL.revokeObjectURL(videoPreview);
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
@@ -97,16 +92,23 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory }: Props) => {
         mediaUrls.push(url);
       }
 
+      const hasMedia = mediaUrls.length > 0;
+
       const { error } = await supabase.from('posts').insert({
         title: title.trim(),
         content: content.trim(),
         author_id: user!.id,
         image_urls: mediaUrls,
         category,
-      });
+        status: hasMedia ? 'pending' : 'approved',
+      } as any);
       if (error) throw error;
 
-      toast.success('Post published!');
+      if (hasMedia) {
+        toast.success('Post submitted! It will be visible after admin approval.');
+      } else {
+        toast.success('Post published!');
+      }
       setTitle(''); setContent(''); setCategory(defaultCategory || '');
       setImages([]); previews.forEach(p => URL.revokeObjectURL(p)); setPreviews([]);
       removeVideo();
@@ -206,7 +208,10 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory }: Props) => {
             </Button>
           </div>
 
-          <p className="text-xs text-muted-foreground">You can attach up to 2 photos or 1 video (max {MAX_VIDEO_MB}MB), not both.</p>
+          <p className="text-xs text-muted-foreground">
+            You can attach up to 2 photos or 1 video (max {MAX_VIDEO_MB}MB), not both.
+            {(images.length > 0 || videoFile) && ' Posts with media require admin approval.'}
+          </p>
 
           <Button onClick={handleSubmit} disabled={loading} className="w-full">
             {loading ? 'Publishing...' : 'Publish Post'}
