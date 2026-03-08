@@ -18,13 +18,23 @@ const PostDetail = () => {
 
   const fetchPost = useCallback(async () => {
     if (!id) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('posts')
-      .select('*, author:profiles_public!posts_author_id_fkey(id, username, is_verified)')
+      .select('id, title, content, created_at, image_urls, category, status, author_id')
       .eq('id', id)
       .single();
 
-    if (!data) { setLoading(false); return; }
+    if (error || !data) { setLoading(false); return; }
+
+    let author: any = null;
+    if ((data as any).author_id) {
+      const { data: authorData } = await supabase
+        .from('profiles_public')
+        .select('id, username, is_verified, avatar_url')
+        .eq('id', (data as any).author_id)
+        .maybeSingle();
+      author = authorData;
+    }
 
     const { data: likesData } = await supabase
       .from('likes')
@@ -38,7 +48,7 @@ const PostDetail = () => {
 
     setPost({
       ...data,
-      author: data.author,
+      author: author || { id: (data as any).author_id, username: 'Unknown user', is_verified: false, avatar_url: null },
       image_urls: (data as any).image_urls || [],
       likes_count: likesData?.length || 0,
       comments_count: commentsData?.length || 0,

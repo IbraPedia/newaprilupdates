@@ -33,12 +33,23 @@ const Index = () => {
   const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
 
   const fetchPosts = useCallback(async () => {
-    const { data: postsData } = await supabase
+    const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select('*, author:profiles_public!posts_author_id_fkey(id, username, is_verified, avatar_url)')
+      .select('id, title, content, created_at, image_urls, category, status, author_id')
       .order('created_at', { ascending: false });
 
-    if (!postsData) { setLoading(false); return; }
+    if (postsError || !postsData) { setLoading(false); return; }
+
+    const authorIds = [...new Set(postsData.map((p: any) => p.author_id).filter(Boolean))];
+    let authorsData: any[] = [];
+    if (authorIds.length > 0) {
+      const { data } = await supabase
+        .from('profiles_public')
+        .select('id, username, is_verified, avatar_url')
+        .in('id', authorIds);
+      authorsData = data || [];
+    }
+    const authorsById = new Map(authorsData.map((a: any) => [a.id, a]));
 
     const postIds = postsData.map(p => p.id);
 
@@ -47,7 +58,7 @@ const Index = () => {
 
     const enriched: PostData[] = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,
-      author: p.author, image_urls: p.image_urls || [], category: p.category,
+      author: authorsById.get(p.author_id) || { id: p.author_id, username: 'Unknown user', is_verified: false, avatar_url: null }, image_urls: p.image_urls || [], category: p.category,
       status: p.status,
       likes_count: likesData?.filter(l => l.post_id === p.id).length || 0,
       comments_count: commentsData?.filter(c => c.post_id === p.id).length || 0,
