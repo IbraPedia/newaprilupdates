@@ -28,19 +28,20 @@ const CategoryFeed = () => {
     if (postsError || !postsData) { setLoading(false); return; }
 
     const authorIds = [...new Set(postsData.map((p: any) => p.author_id).filter(Boolean))];
-    let authorsData: any[] = [];
-    if (authorIds.length > 0) {
-      const { data } = await supabase
-        .from('profiles_public')
-        .select('id, username, is_verified, avatar_url')
-        .in('id', authorIds);
-      authorsData = data || [];
-    }
-    const authorsById = new Map(authorsData.map((a: any) => [a.id, a]));
-
     const postIds = postsData.map(p => p.id);
-    const { data: likesData } = await supabase.from('likes').select('post_id, user_id').in('post_id', postIds.length > 0 ? postIds : ['none']);
-    const { data: commentsData } = await supabase.from('comments').select('post_id').in('post_id', postIds.length > 0 ? postIds : ['none']);
+    const safePostIds = postIds.length > 0 ? postIds : ['none'];
+
+    const [authorsRes, likesRes, commentsRes] = await Promise.all([
+      authorIds.length > 0
+        ? supabase.from('profiles_public').select('id, username, is_verified, avatar_url').in('id', authorIds)
+        : Promise.resolve({ data: [] }),
+      supabase.from('likes').select('post_id, user_id').in('post_id', safePostIds),
+      supabase.from('comments').select('post_id').in('post_id', safePostIds),
+    ]);
+
+    const authorsById = new Map((authorsRes.data || []).map((a: any) => [a.id, a]));
+    const likesData = likesRes.data;
+    const commentsData = commentsRes.data;
 
     const enriched = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,

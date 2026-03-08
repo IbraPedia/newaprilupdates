@@ -26,25 +26,18 @@ const PostDetail = () => {
 
     if (error || !data) { setLoading(false); return; }
 
-    let author: any = null;
-    if ((data as any).author_id) {
-      const { data: authorData } = await supabase
-        .from('profiles_public')
-        .select('id, username, is_verified, avatar_url')
-        .eq('id', (data as any).author_id)
-        .maybeSingle();
-      author = authorData;
-    }
+    // Fetch author, likes, comments in parallel
+    const [authorRes, likesRes, commentsRes] = await Promise.all([
+      (data as any).author_id
+        ? supabase.from('profiles_public').select('id, username, is_verified, avatar_url').eq('id', (data as any).author_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase.from('likes').select('user_id').eq('post_id', id),
+      supabase.from('comments').select('id').eq('post_id', id),
+    ]);
 
-    const { data: likesData } = await supabase
-      .from('likes')
-      .select('user_id')
-      .eq('post_id', id);
-
-    const { data: commentsData } = await supabase
-      .from('comments')
-      .select('id')
-      .eq('post_id', id);
+    const author = authorRes.data;
+    const likesData = likesRes.data;
+    const commentsData = commentsRes.data;
 
     setPost({
       ...data,
