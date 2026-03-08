@@ -236,6 +236,11 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
       const { error } = await supabase.from('reports').insert({ reporter_id: user.id, post_id: post.id, reason: reason.trim() });
       if (error) throw error;
       toast.success('Report submitted. Thank you.');
+      // Notify admins via email
+      const siteUrl = window.location.origin;
+      supabase.functions.invoke('notify-report', {
+        body: { postId: post.id, reason: reason.trim(), contentUrl: `${siteUrl}/post/${post.id}` },
+      }).catch(() => {});
     } catch { toast.error('Failed to submit report'); }
   };
 
@@ -247,6 +252,10 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
       const { error } = await supabase.from('reports').insert({ reporter_id: user.id, comment_id: commentId, reason: reason.trim() });
       if (error) throw error;
       toast.success('Report submitted. Thank you.');
+      const siteUrl = window.location.origin;
+      supabase.functions.invoke('notify-report', {
+        body: { commentId, postId: post.id, reason: reason.trim(), contentUrl: `${siteUrl}/post/${post.id}` },
+      }).catch(() => {});
     } catch { toast.error('Failed to submit report'); }
   };
 
