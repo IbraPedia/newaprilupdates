@@ -78,14 +78,6 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   )}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <button onClick={signOut} className="flex w-full items-center hover:bg-muted/50 px-2 py-1.5 rounded-md text-sm">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        {!collapsed && <span>Logout</span>}
-                      </button>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
                 </>
               ) : (
                 <SidebarMenuItem>
@@ -123,6 +115,23 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {user && (
+          <SidebarGroup className="mt-auto">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <button onClick={signOut} className="flex w-full items-center hover:bg-destructive/10 px-2 py-1.5 rounded-md text-sm text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {!collapsed && <span>Logout</span>}
+                    </button>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );
