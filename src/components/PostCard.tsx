@@ -86,12 +86,24 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   }, [user, post.id]);
 
   const fetchComments = async () => {
-    const { data } = await supabase
+    const { data: rawComments } = await supabase
       .from('comments')
-      .select('*, author:profiles_public!comments_author_id_fkey(id, username, is_verified, avatar_url)')
+      .select('id, content, created_at, author_id, parent_comment_id, media_url, status')
       .eq('post_id', post.id)
       .order('created_at', { ascending: false });
-    if (data) setComments(data as any);
+    if (!rawComments) return;
+
+    const authorIds = [...new Set(rawComments.map((c: any) => c.author_id).filter(Boolean))];
+    const { data: authorsData } = authorIds.length > 0
+      ? await supabase.from('profiles_public').select('id, username, is_verified, avatar_url').in('id', authorIds)
+      : { data: [] };
+    const authorsById = new Map((authorsData || []).map((a: any) => [a.id, a]));
+
+    const enriched = rawComments.map((c: any) => ({
+      ...c,
+      author: authorsById.get(c.author_id) || { id: c.author_id, username: 'Unknown', is_verified: false, avatar_url: null },
+    }));
+    setComments(enriched);
   };
 
   useEffect(() => {
