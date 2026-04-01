@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { uploadFile, compressImage } from '@/lib/supabaseStorage';
+import { containsMiddleFinger, suspendUserForEmoji, checkSuspension } from '@/lib/moderation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -76,6 +77,20 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory }: Props) => {
     if (!title.trim() || !content.trim()) { toast.error('Please fill in both title and content'); return; }
     if (!category) { toast.error('Please select a category'); return; }
     if (content.length > MAX_CHARS) { toast.error(`Content must be under ${MAX_CHARS.toLocaleString()} characters`); return; }
+
+    // Check for middle finger emoji
+    if (containsMiddleFinger(title) || containsMiddleFinger(content)) {
+      toast.error('Your account has been suspended for 14 days for using a prohibited emoji.');
+      try { await suspendUserForEmoji(user!.id); } catch {}
+      return;
+    }
+
+    // Check suspension
+    const { suspended, expiresAt } = await checkSuspension(user!.id);
+    if (suspended) {
+      toast.error(`Your account is suspended until ${new Date(expiresAt!).toLocaleDateString()}. You can only read content.`);
+      return;
+    }
 
     setLoading(true);
     try {

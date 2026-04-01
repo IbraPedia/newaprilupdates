@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useModRole } from '@/hooks/useModRole';
 import { uploadFile, compressImage } from '@/lib/supabaseStorage';
+import { containsMiddleFinger, suspendUserForEmoji, checkSuspension } from '@/lib/moderation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -148,6 +149,20 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     if (!user) { toast.error('Please sign in to comment'); return; }
     if (!newComment.trim() && !commentMedia) return;
     if (newComment.length > MAX_COMMENT_CHARS) { toast.error(`Comment must be under ${MAX_COMMENT_CHARS} characters`); return; }
+
+    // Check for middle finger emoji
+    if (containsMiddleFinger(newComment)) {
+      toast.error('Your account has been suspended for 14 days for using a prohibited emoji.');
+      try { await suspendUserForEmoji(user.id); } catch {}
+      return;
+    }
+
+    // Check if user is suspended
+    const { suspended, expiresAt } = await checkSuspension(user.id);
+    if (suspended) {
+      toast.error(`Your account is suspended until ${new Date(expiresAt!).toLocaleDateString()}. You can only read content.`);
+      return;
+    }
     setLoadingComment(true);
     try {
       let media_url: string | null = null;

@@ -365,6 +365,33 @@ export type Database = {
           },
         ]
       }
+      suspensions: {
+        Row: {
+          created_by: string
+          expires_at: string
+          id: string
+          reason: string
+          suspended_at: string
+          user_id: string
+        }
+        Insert: {
+          created_by?: string
+          expires_at: string
+          id?: string
+          reason: string
+          suspended_at?: string
+          user_id: string
+        }
+        Update: {
+          created_by?: string
+          expires_at?: string
+          id?: string
+          reason?: string
+          suspended_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
