@@ -17,8 +17,9 @@ interface Notification {
   read: boolean;
   created_at: string;
   post_id: string;
-  actor: { username: string };
-  post: { title: string };
+  actor_id: string;
+  actor_username?: string;
+  post_title?: string;
 }
 
 const NotificationDropdown = () => {
@@ -31,11 +32,35 @@ const NotificationDropdown = () => {
     if (!user) return;
     const { data } = await supabase
       .from('notifications')
-      .select('*, actor:profiles!notifications_actor_id_fkey(username), post:posts!notifications_post_id_fkey(title)')
+      .select('id, type, read, created_at, post_id, actor_id')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20);
-    if (data) setNotifications(data as any);
+    if (!data || data.length === 0) { setNotifications([]); return; }
+
+    // Fetch actor usernames and post titles in parallel
+    const actorIds = [...new Set(data.map(n => n.actor_id).filter(Boolean))];
+    const postIds = [...new Set(data.map(n => n.post_id).filter(Boolean))];
+
+    const [actorsRes, postsRes] = await Promise.all([
+      actorIds.length > 0
+        ? supabase.from('profiles_public').select('id, username').in('id', actorIds)
+        : Promise.resolve({ data: [] }),
+      postIds.length > 0
+        ? supabase.from('posts').select('id, title').in('id', postIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    const actorsMap = new Map((actorsRes.data || []).map((a: any) => [a.id, a.username]));
+    const postsMap = new Map((postsRes.data || []).map((p: any) => [p.id, p.title]));
+
+    const enriched: Notification[] = data.map((n: any) => ({
+      ...n,
+      actor_username: actorsMap.get(n.actor_id) || 'Someone',
+      post_title: postsMap.get(n.post_id) || 'a post',
+    }));
+
+    setNotifications(enriched);
   };
 
   useEffect(() => {
@@ -66,7 +91,6 @@ const NotificationDropdown = () => {
   };
 
   const handleClick = async (n: Notification) => {
-    // Mark as read
     if (!n.read) {
       await supabase.from('notifications').update({ read: true }).eq('id', n.id);
       fetchNotifications();
@@ -109,9 +133,9 @@ const NotificationDropdown = () => {
                 className={`w-full text-left border-b p-3 text-sm hover:bg-accent/50 transition-colors ${!n.read ? 'bg-secondary/50' : ''}`}
               >
                 <p>
-                  <span className="font-semibold">{n.actor?.username}</span>{' '}
+                  <span className="font-semibold">{n.actor_username}</span>{' '}
                   {n.type === 'like' ? 'liked' : 'commented on'}{' '}
-                  <span className="font-medium">"{n.post?.title}"</span>
+                  <span className="font-medium">"{n.post_title}"</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}

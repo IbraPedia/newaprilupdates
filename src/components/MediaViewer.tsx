@@ -19,7 +19,7 @@ const MediaViewer = ({ open, onClose, url, isVideo }: MediaViewerProps) => {
           <X className="h-5 w-5" />
         </button>
         {isVideo ? (
-          <video src={url} controls autoPlay className="max-w-full max-h-[90vh] rounded" />
+          <video src={url} controls autoPlay playsInline preload="auto" className="max-w-full max-h-[90vh] rounded bg-black" />
         ) : (
           <img src={url} alt="" className="max-w-full max-h-[90vh] object-contain rounded" />
         )}

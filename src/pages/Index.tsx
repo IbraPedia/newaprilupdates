@@ -103,11 +103,6 @@ const Index = () => {
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
 
-  // Forum stats
-  const approvedPosts = posts.filter(p => p.status !== 'pending');
-  const totalPosts = approvedPosts.filter(p => p.content.length <= 500).length;
-  const totalThreads = approvedPosts.filter(p => p.content.length > 500).length;
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -117,7 +112,6 @@ const Index = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search posts..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
-          {user && <CreatePostDialog onPostCreated={fetchPosts} />}
         </div>
 
         <div className="space-y-4">
@@ -144,19 +138,14 @@ const Index = () => {
             </>
           )}
         </div>
-
-        {/* Forum Stats Bar */}
-        <div className="mt-8 py-4 border-t text-center">
-          <p className="text-sm font-bold text-foreground" style={{ fontFamily: 'var(--font-heading)' }}>
-            Kanisa Kiganjani Stats
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Posts <span className="font-bold text-foreground">{totalPosts}</span>
-            {' · '}
-            Threads <span className="font-bold text-foreground">{totalThreads}</span>
-          </p>
-        </div>
       </main>
+
+      {/* Floating Create Post Button */}
+      {user && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <CreatePostDialog onPostCreated={fetchPosts} />
+        </div>
+      )}
     </div>
   );
 };

@@ -50,7 +50,10 @@ const VerifiedBadge = () => (
   <BadgeCheck className="h-4 w-4 text-blue-500 inline-block ml-0.5 shrink-0" />
 );
 
-const isMediaVideo = (url: string) => url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
+const isMediaVideo = (url: string) => {
+  const lower = url.toLowerCase();
+  return lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mov') || lower.includes('.quicktime') || lower.includes('video');
+};
 
 const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }: { post: Post; onUpdate: () => void; expanded?: boolean; autoShowComments?: boolean }) => {
   const { user } = useAuth();
@@ -390,8 +393,8 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
                   isVideo ? (
                     <video
                       src={c.media_url}
-                      controls
-                      className="w-full rounded max-h-48 mt-1 border cursor-pointer"
+                      controls preload="metadata" playsInline
+                      className="w-full rounded max-h-48 mt-1 border cursor-pointer bg-black"
                       onClick={(e) => { e.preventDefault(); setViewerMedia({ url: c.media_url!, isVideo: true }); }}
                     />
                   ) : (
@@ -479,8 +482,8 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
             {post.image_urls.map((url, i) =>
               isMediaVideo(url) ? (
                 <video
-                  key={i} src={url} controls
-                  className="w-full rounded-lg max-h-64 border cursor-pointer"
+                  key={i} src={url} controls preload="metadata" playsInline
+                  className="w-full rounded-lg max-h-64 border cursor-pointer bg-black"
                   onClick={(e) => { e.preventDefault(); setViewerMedia({ url, isVideo: true }); }}
                 />
               ) : (

@@ -55,8 +55,15 @@ const Auth = () => {
     return () => clearTimeout(timer);
   }, [username]);
 
+  const ALLOWED_DOMAINS = ['gmail.com', 'icloud.com', 'yahoo.com'];
+
   const handleSendOtp = async () => {
     if (!email) { toast.error('Please enter your email'); return; }
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain || !ALLOWED_DOMAINS.includes(domain)) {
+      toast.error('Only Gmail, iCloud, and Yahoo email addresses are allowed');
+      return;
+    }
     if (isSignUp) {
       if (!firstName.trim() || !lastName.trim()) { toast.error('Please enter your full name'); return; }
       const usernameError = validateUsername(username);
