@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { CATEGORIES } from '@/lib/categories';
 import MediaViewer from '@/components/MediaViewer';
+import DOMPurify from 'dompurify';
 
 interface Post {
   id: string;
