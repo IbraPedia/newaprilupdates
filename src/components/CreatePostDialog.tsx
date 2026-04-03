@@ -54,6 +54,7 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
   };
 
   const handleSubmit = async () => {
+    if (!postTitle.trim()) { toast.error('Please add a title'); return; }
     if (!content.trim()) { toast.error('Please write something'); return; }
     if (!category) { toast.error('Please select a category'); return; }
     if (content.length > MAX_CHARS) { toast.error(`Post must be under ${MAX_CHARS} characters`); return; }
