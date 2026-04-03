@@ -301,7 +301,18 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   const canEditPost = isMod || (isAuthor && canEditTime(post.created_at));
   const canDeletePost = isMod || (isAuthor && canDeleteTime(post.created_at));
 
+  const isThread = post.type === 'thread';
+
   const renderContent = () => {
+    if (isThread) {
+      // Thread content is HTML from TipTap – sanitize and render
+      const html = needsTruncation ? post.content.slice(0, PREVIEW_LENGTH) + '…' : post.content;
+      return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'strong', 'em', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'br', 'img'],
+        ALLOWED_ATTR: ['src', 'alt', 'class'],
+      });
+    }
+    // Regular post – escape HTML and apply markdown-like formatting
     const raw = needsTruncation ? post.content.slice(0, PREVIEW_LENGTH) + '…' : post.content;
     return raw
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
