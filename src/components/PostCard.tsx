@@ -504,7 +504,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
       <CardContent className="space-y-3">
         {!editingPost && (
           <>
-            <p className="text-foreground/90 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderContent() }} />
+            <div className={`text-foreground/90 ${isThread ? 'prose prose-sm dark:prose-invert max-w-none' : 'whitespace-pre-wrap'}`} dangerouslySetInnerHTML={{ __html: renderContent() }} />
             {needsTruncation && (
               <Link to={`/post/${post.id}`} className="text-primary text-sm font-medium hover:underline">Read more</Link>
             )}

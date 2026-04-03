@@ -203,7 +203,6 @@ const CreateThread = () => {
 
           <p className="text-xs text-muted-foreground">
             Write your thread using the formatting tools above. Insert images between paragraphs.
-            Posts with media require admin approval.
           </p>
 
           <Button onClick={handleSubmit} disabled={loading} className="w-full">

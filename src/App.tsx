@@ -49,6 +49,7 @@ const App = () => (
                   <Route path="/create-thread" element={<CreateThread />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                </Suspense>
               </div>
             </div>
           </SidebarProvider>
