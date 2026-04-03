@@ -115,6 +115,13 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
           <DialogTitle style={{ fontFamily: 'var(--font-heading)' }}>Create a Post</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
+          <Input
+            placeholder="Post title"
+            value={postTitle}
+            onChange={(e) => setPostTitle(e.target.value)}
+            maxLength={100}
+          />
+
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
             <SelectContent>
