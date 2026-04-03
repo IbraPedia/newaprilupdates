@@ -43,8 +43,11 @@ interface Comment {
   status?: string;
 }
 
-const PREVIEW_LENGTH = 200;
+const PREVIEW_LENGTH = 140;
 const MAX_COMMENT_CHARS = 1000;
+const MAX_PREVIEW_THUMBNAILS = 3;
+const HTML_CONTENT_REGEX = /<\/?[a-z][\s\S]*>/i;
+const INLINE_IMAGE_REGEX = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
 
 const canEditTime = (createdAt: string) => (Date.now() - new Date(createdAt).getTime()) < 12 * 60 * 60 * 1000;
 const canDeleteTime = (createdAt: string) => (Date.now() - new Date(createdAt).getTime()) < 48 * 60 * 60 * 1000;
@@ -57,6 +60,41 @@ const isMediaVideo = (url: string) => {
   const lower = url.toLowerCase();
   return lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mov') || lower.includes('.quicktime') || lower.includes('video');
 };
+
+const sanitizeRichContent = (content: string) => DOMPurify.sanitize(content, {
+  ALLOWED_TAGS: ['p', 'strong', 'em', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'br', 'img'],
+  ALLOWED_ATTR: ['src', 'alt', 'class', 'width', 'height', 'loading', 'decoding'],
+});
+
+const htmlToPlainText = (html: string) => {
+  const withoutImages = html.replace(/<img[^>]*>/gi, ' ');
+
+  if (typeof window !== 'undefined') {
+    const doc = new window.DOMParser().parseFromString(withoutImages, 'text/html');
+    return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  return withoutImages
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const truncateText = (text: string, maxLength: number) => (
+  text.length <= maxLength ? text : `${text.slice(0, maxLength).trimEnd()}…`
+);
+
+const extractInlineImageUrls = (html: string) => (
+  Array.from(html.matchAll(INLINE_IMAGE_REGEX))
+    .map((match) => match[1]?.trim())
+    .filter((url): url is string => Boolean(url))
+);
 
 const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }: { post: Post; onUpdate: () => void; expanded?: boolean; autoShowComments?: boolean }) => {
   const { user } = useAuth();
@@ -81,7 +119,6 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
 
   const categoryInfo = CATEGORIES.find(c => c.slug === post.category);
   const isAuthor = user?.id === post.author.id;
-  const needsTruncation = !expanded && post.content.length > PREVIEW_LENGTH;
   const isPending = post.status === 'pending';
 
   useEffect(() => {
@@ -302,24 +339,24 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   const canDeletePost = isMod || (isAuthor && canDeleteTime(post.created_at));
 
   const isThread = post.type === 'thread';
+  const hasRichHtmlContent = isThread || HTML_CONTENT_REGEX.test(post.content);
+  const sanitizedRichContent = hasRichHtmlContent ? sanitizeRichContent(post.content) : '';
+  const previewSourceText = hasRichHtmlContent ? htmlToPlainText(sanitizedRichContent) : post.content.replace(/\s+/g, ' ').trim();
+  const needsTruncation = !expanded && previewSourceText.length > PREVIEW_LENGTH;
+  const previewText = truncateText(previewSourceText, PREVIEW_LENGTH);
+  const previewImageUrls = !expanded
+    ? [...new Set([
+        ...(hasRichHtmlContent ? extractInlineImageUrls(sanitizedRichContent) : []),
+        ...((post.image_urls || []).filter((url) => !isMediaVideo(url))),
+      ])].slice(0, MAX_PREVIEW_THUMBNAILS)
+    : [];
 
-  const renderContent = () => {
-    if (isThread) {
-      if (needsTruncation) {
-        // Strip all HTML tags to get plain text for preview
-        const plainText = post.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        const truncated = plainText.slice(0, PREVIEW_LENGTH) + '…';
-        return truncated.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      }
-      // Full view – sanitize and render HTML
-      return DOMPurify.sanitize(post.content, {
-        ALLOWED_TAGS: ['p', 'strong', 'em', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'br', 'img'],
-        ALLOWED_ATTR: ['src', 'alt', 'class'],
-      });
+  const renderExpandedContent = () => {
+    if (hasRichHtmlContent) {
+      return sanitizedRichContent;
     }
-    // Regular post – escape HTML and apply markdown-like formatting
-    const raw = needsTruncation ? post.content.slice(0, PREVIEW_LENGTH) + '…' : post.content;
-    return raw
+
+    return post.content
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -509,7 +546,31 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
       <CardContent className="space-y-3">
         {!editingPost && (
           <>
-            <div className={`text-foreground/90 ${isThread ? 'prose prose-sm dark:prose-invert max-w-none' : 'whitespace-pre-wrap'}`} dangerouslySetInnerHTML={{ __html: renderContent() }} />
+            {expanded ? (
+              <div
+                className={`text-foreground/90 ${hasRichHtmlContent ? 'prose prose-sm dark:prose-invert max-w-none' : 'whitespace-pre-wrap'}`}
+                dangerouslySetInnerHTML={{ __html: renderExpandedContent() }}
+              />
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm leading-6 text-foreground/90 whitespace-pre-wrap break-words">{previewText}</p>
+                {previewImageUrls.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {previewImageUrls.map((url, index) => (
+                      <img
+                        key={`${url}-${index}`}
+                        src={url}
+                        alt="Post preview thumbnail"
+                        className="h-20 w-full rounded-md border object-cover"
+                        loading="lazy"
+                        width={96}
+                        height={80}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {needsTruncation && (
               <Link to={`/post/${post.id}`} className="text-primary text-sm font-medium hover:underline">Read more</Link>
             )}
@@ -517,7 +578,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
         )}
 
         {/* Media - clickable for fullscreen */}
-        {post.image_urls && post.image_urls.length > 0 && (
+        {expanded && post.image_urls && post.image_urls.length > 0 && (
           <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {post.image_urls.map((url, i) =>
               isMediaVideo(url) ? (
