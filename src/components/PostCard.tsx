@@ -305,9 +305,14 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
 
   const renderContent = () => {
     if (isThread) {
-      // Thread content is HTML from TipTap – sanitize and render
-      const html = needsTruncation ? post.content.slice(0, PREVIEW_LENGTH) + '…' : post.content;
-      return DOMPurify.sanitize(html, {
+      if (needsTruncation) {
+        // Strip all HTML tags to get plain text for preview
+        const plainText = post.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const truncated = plainText.slice(0, PREVIEW_LENGTH) + '…';
+        return truncated.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+      // Full view – sanitize and render HTML
+      return DOMPurify.sanitize(post.content, {
         ALLOWED_TAGS: ['p', 'strong', 'em', 'h1', 'h2', 'h3', 'ul', 'ol', 'li', 'br', 'img'],
         ALLOWED_ATTR: ['src', 'alt', 'class'],
       });
