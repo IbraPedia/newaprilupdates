@@ -10,9 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Pencil, Save, X, MapPin, User, Calendar } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Pencil, Save, X, MapPin, User, Calendar, FileText, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateUsername } from '@/lib/usernameValidation';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ProfileData {
   id: string;
@@ -31,6 +33,7 @@ const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [drafts, setDrafts] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -103,8 +106,25 @@ const Profile = () => {
     setLoading(false);
   };
 
+  const fetchDrafts = async () => {
+    if (!isOwnProfile || !user) return;
+    const { data } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+    setDrafts(data || []);
+  };
+
+  const handleDeleteDraft = async (draftId: string) => {
+    if (!confirm('Delete this draft?')) return;
+    await supabase.from('drafts').delete().eq('id', draftId);
+    toast.success('Draft deleted');
+    fetchDrafts();
+  };
+
   useEffect(() => {
-    if (user) { fetchProfile(); fetchPosts(); }
+    if (user) { fetchProfile(); fetchPosts(); fetchDrafts(); }
   }, [id, user]);
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,16 +260,68 @@ const Profile = () => {
           </Card>
         )}
 
-        <h2 className="text-lg font-bold mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
-          {isOwnProfile ? 'Your Posts' : `Posts by ${profile?.username}`}
-        </h2>
-        <div className="space-y-4">
-          {posts.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No posts yet.</p>
-          ) : (
-            posts.map(post => <PostCard key={post.id} post={post} onUpdate={fetchPosts} />)
-          )}
-        </div>
+        {isOwnProfile ? (
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="posts">Posts</TabsTrigger>
+              <TabsTrigger value="drafts" className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Drafts {drafts.length > 0 && `(${drafts.length})`}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="posts">
+              <div className="space-y-4">
+                {posts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No posts yet.</p>
+                ) : (
+                  posts.map(post => <PostCard key={post.id} post={post} onUpdate={fetchPosts} />)
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="drafts">
+              <div className="space-y-3">
+                {drafts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No drafts saved.</p>
+                ) : (
+                  drafts.map((draft: any) => (
+                    <Card key={draft.id} className="shadow-card">
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <Link to={`/create-thread?draft=${draft.id}`} className="font-semibold text-sm hover:underline truncate block">
+                            {draft.title || 'Untitled Draft'}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            Last edited {formatDistanceToNow(new Date(draft.updated_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to={`/create-thread?draft=${draft.id}`}>Edit</Link>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteDraft(draft.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <>
+            <h2 className="text-lg font-bold mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
+              Posts by {profile?.username}
+            </h2>
+            <div className="space-y-4">
+              {posts.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No posts yet.</p>
+              ) : (
+                posts.map(post => <PostCard key={post.id} post={post} onUpdate={fetchPosts} />)
+              )}
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
