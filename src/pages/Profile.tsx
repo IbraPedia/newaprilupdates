@@ -106,8 +106,25 @@ const Profile = () => {
     setLoading(false);
   };
 
+  const fetchDrafts = async () => {
+    if (!isOwnProfile || !user) return;
+    const { data } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+    setDrafts(data || []);
+  };
+
+  const handleDeleteDraft = async (draftId: string) => {
+    if (!confirm('Delete this draft?')) return;
+    await supabase.from('drafts').delete().eq('id', draftId);
+    toast.success('Draft deleted');
+    fetchDrafts();
+  };
+
   useEffect(() => {
-    if (user) { fetchProfile(); fetchPosts(); }
+    if (user) { fetchProfile(); fetchPosts(); fetchDrafts(); }
   }, [id, user]);
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
