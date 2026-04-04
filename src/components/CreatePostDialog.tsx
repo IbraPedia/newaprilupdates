@@ -167,12 +167,12 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
             <input ref={fileInputRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" multiple onChange={handleImageSelect} className="hidden" />
             <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}
               disabled={images.length >= MAX_IMAGES} className="gap-1.5">
-              <ImagePlus className="h-4 w-4" /> Photos ({images.length}/{MAX_IMAGES})
+              <ImagePlus className="h-4 w-4" /> Media ({images.length}/{MAX_IMAGES})
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Up to {MAX_IMAGES} photos.
+            Up to {MAX_IMAGES} photos or videos.
           </p>
 
           <Button onClick={handleSubmit} disabled={loading} className="w-full">
