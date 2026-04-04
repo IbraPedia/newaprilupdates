@@ -33,6 +33,7 @@ const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [drafts, setDrafts] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
