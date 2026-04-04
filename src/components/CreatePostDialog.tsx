@@ -149,7 +149,11 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
             <div className="grid grid-cols-2 gap-2">
               {previews.map((src, i) => (
                 <div key={i} className="relative group rounded-lg overflow-hidden border">
-                  <img src={src} alt="" className="w-full h-32 object-cover" />
+                  {images[i]?.type.startsWith('video/') ? (
+                    <video src={src} className="w-full h-32 object-cover" preload="metadata" />
+                  ) : (
+                    <img src={src} alt="" className="w-full h-32 object-cover" />
+                  )}
                   <button type="button" onClick={() => removeImage(i)}
                     className="absolute top-1 right-1 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <X className="h-4 w-4" />
