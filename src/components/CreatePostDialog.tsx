@@ -149,7 +149,11 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
             <div className="grid grid-cols-2 gap-2">
               {previews.map((src, i) => (
                 <div key={i} className="relative group rounded-lg overflow-hidden border">
-                  <img src={src} alt="" className="w-full h-32 object-cover" />
+                  {images[i]?.type.startsWith('video/') ? (
+                    <video src={src} className="w-full h-32 object-cover" preload="metadata" />
+                  ) : (
+                    <img src={src} alt="" className="w-full h-32 object-cover" />
+                  )}
                   <button type="button" onClick={() => removeImage(i)}
                     className="absolute top-1 right-1 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <X className="h-4 w-4" />
@@ -160,15 +164,15 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
           )}
 
           <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
+            <input ref={fileInputRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" multiple onChange={handleImageSelect} className="hidden" />
             <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}
               disabled={images.length >= MAX_IMAGES} className="gap-1.5">
-              <ImagePlus className="h-4 w-4" /> Photos ({images.length}/{MAX_IMAGES})
+              <ImagePlus className="h-4 w-4" /> Media ({images.length}/{MAX_IMAGES})
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Up to {MAX_IMAGES} photos.
+            Up to {MAX_IMAGES} photos or videos.
           </p>
 
           <Button onClick={handleSubmit} disabled={loading} className="w-full">

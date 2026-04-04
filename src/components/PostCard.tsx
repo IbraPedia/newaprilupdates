@@ -350,6 +350,9 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
         ...((post.image_urls || []).filter((url) => !isMediaVideo(url))),
       ])].slice(0, MAX_PREVIEW_THUMBNAILS)
     : [];
+  const previewVideoUrls = !expanded
+    ? (post.image_urls || []).filter((url) => isMediaVideo(url)).slice(0, 1)
+    : [];
 
   const renderExpandedContent = () => {
     if (hasRichHtmlContent) {
@@ -554,6 +557,20 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
             ) : (
               <div className="space-y-3">
                 <p className="text-sm leading-6 text-foreground/90 whitespace-pre-wrap break-words">{previewText}</p>
+                {previewVideoUrls.length > 0 && (
+                  <div className="mt-1">
+                    {previewVideoUrls.map((url, index) => (
+                      <video
+                        key={`vid-${index}`}
+                        src={url}
+                        controls
+                        preload="metadata"
+                        playsInline
+                        className="w-full rounded-lg max-h-48 border bg-black"
+                      />
+                    ))}
+                  </div>
+                )}
                 {previewImageUrls.length > 0 && (
                   <div className="grid grid-cols-3 gap-2">
                     {previewImageUrls.map((url, index) => (
