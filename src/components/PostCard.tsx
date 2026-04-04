@@ -350,6 +350,9 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
         ...((post.image_urls || []).filter((url) => !isMediaVideo(url))),
       ])].slice(0, MAX_PREVIEW_THUMBNAILS)
     : [];
+  const previewVideoUrls = !expanded
+    ? (post.image_urls || []).filter((url) => isMediaVideo(url)).slice(0, 1)
+    : [];
 
   const renderExpandedContent = () => {
     if (hasRichHtmlContent) {
