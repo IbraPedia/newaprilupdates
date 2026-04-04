@@ -10,9 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Pencil, Save, X, MapPin, User, Calendar } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Pencil, Save, X, MapPin, User, Calendar, FileText, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateUsername } from '@/lib/usernameValidation';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ProfileData {
   id: string;
