@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRecordImpressionsBatch } from '@/hooks/useImpressions';
 import Navbar from '@/components/Navbar';
 import PostCard from '@/components/PostCard';
 import CreateContentChooser from '@/components/CreateContentChooser';
 import GuestLoginPrompt from '@/components/GuestLoginPrompt';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 
 interface PostData {
