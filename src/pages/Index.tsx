@@ -23,6 +23,7 @@ interface PostData {
   image_urls?: string[];
   category?: string;
   status?: string;
+  impressions?: number;
 }
 
 const POSTS_PER_PAGE = 30;

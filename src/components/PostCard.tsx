@@ -615,18 +615,33 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
           <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {post.image_urls.map((url, i) =>
               isMediaVideo(url) ? (
-                <video
-                  key={i} src={url} controls preload="metadata" playsInline
-                  className="w-full rounded-lg max-h-64 border cursor-pointer bg-black"
-                  onClick={(e) => { e.preventDefault(); setViewerMedia({ url, isVideo: true }); }}
-                />
+                <div
+                  key={i}
+                  className="relative aspect-square rounded-lg border overflow-hidden bg-black cursor-pointer group"
+                  onClick={() => setViewerMedia({ url, isVideo: true })}
+                >
+                  <video
+                    src={url} preload="metadata" playsInline muted
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                    <div className="bg-background/80 rounded-full p-3">
+                      <Play className="h-6 w-6 text-foreground fill-current" />
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <img
-                  key={i} src={url} alt=""
-                  className="w-full rounded-lg object-cover max-h-64 border cursor-pointer hover:opacity-90 transition-opacity"
-                  loading="lazy"
+                <div
+                  key={i}
+                  className="aspect-square rounded-lg border overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={() => setViewerMedia({ url, isVideo: false })}
-                />
+                >
+                  <img
+                    src={url} alt=""
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
               )
             )}
           </div>
