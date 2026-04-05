@@ -48,6 +48,7 @@ const App = () => (
                   <Route path="/moderation" element={<Moderation />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/create-thread" element={<CreateThread />} />
+                  <Route path="/search" element={<SearchResults />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>

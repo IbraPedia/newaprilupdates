@@ -9,6 +9,7 @@ import CreateContentChooser from '@/components/CreateContentChooser';
 import GuestLoginPrompt from '@/components/GuestLoginPrompt';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 
 interface PostData {
@@ -30,6 +31,7 @@ const POSTS_PER_PAGE = 30;
 
 const Index = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -38,7 +40,7 @@ const Index = () => {
   const fetchPosts = useCallback(async () => {
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select('id, title, content, created_at, image_urls, category, status, author_id, type')
+      .select('id, title, content, created_at, image_urls, category, status, author_id, type, impressions')
       .order('created_at', { ascending: false });
 
     if (postsError || !postsData) { setLoading(false); return; }
@@ -47,7 +49,6 @@ const Index = () => {
     const postIds = postsData.map(p => p.id);
     const safePostIds = postIds.length > 0 ? postIds : ['none'];
 
-    // Fetch profiles, likes, comments in parallel
     const [authorsRes, likesRes, commentsRes] = await Promise.all([
       authorIds.length > 0
         ? supabase.from('profiles_public').select('id, username, is_verified, avatar_url').in('id', authorIds)
@@ -62,21 +63,21 @@ const Index = () => {
 
     const enriched: PostData[] = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,
-      author: authorsById.get(p.author_id) || { id: p.author_id, username: 'Unknown user', is_verified: false, avatar_url: null }, image_urls: p.image_urls || [], category: p.category,
-      status: p.status,
+      author: authorsById.get(p.author_id) || { id: p.author_id, username: 'Unknown user', is_verified: false, avatar_url: null },
+      image_urls: p.image_urls || [], category: p.category, status: p.status,
+      impressions: p.impressions || 0,
       likes_count: likesData?.filter(l => l.post_id === p.id).length || 0,
       comments_count: commentsData?.filter(c => c.post_id === p.id).length || 0,
       user_liked: user ? likesData?.some(l => l.post_id === p.id && l.user_id === user.id) || false : false,
     }));
 
-    // Sorting: recent first, then engagement, verified boost for 23h only
     const now = Date.now();
     const VERIFIED_BOOST_MS = 23 * 60 * 60 * 1000;
 
     const sorted = [...enriched].sort((a, b) => {
       const getScore = (p: PostData) => {
         const recency = new Date(p.created_at).getTime();
-        const engagement = (p.likes_count + p.comments_count) * 1800000; // 30min boost per interaction
+        const engagement = (p.likes_count + p.comments_count) * 1800000;
         const postAge = now - new Date(p.created_at).getTime();
         const verifiedBoost = p.author.is_verified && postAge < VERIFIED_BOOST_MS
           ? (VERIFIED_BOOST_MS - postAge) : 0;
@@ -91,6 +92,10 @@ const Index = () => {
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
+  // Record impressions for visible posts
+  const visible = posts.slice(0, visibleCount);
+  useRecordImpressionsBatch(visible.map(p => p.id));
+
   useEffect(() => {
     const channel = supabase
       .channel('public:posts')
@@ -99,23 +104,30 @@ const Index = () => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchPosts]);
 
-  const filtered = search.trim()
-    ? posts.filter(p => p.title.toLowerCase().includes(search.toLowerCase()) || p.content.toLowerCase().includes(search.toLowerCase()))
-    : posts;
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (search.trim()) {
+      navigate(`/search?q=${encodeURIComponent(search.trim())}`);
+    }
+  };
 
-  const visible = filtered.slice(0, visibleCount);
-  const hasMore = visibleCount < filtered.length;
+  const hasMore = visibleCount < posts.length;
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto max-w-2xl px-4 py-6">
-        <div className="flex items-center justify-between mb-4">
+        <form onSubmit={handleSearch} className="flex items-center justify-between mb-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search posts..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            <Input
+              placeholder="Search posts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        </div>
+        </form>
 
         <div className="space-y-4">
           {loading ? (
@@ -126,9 +138,7 @@ const Index = () => {
             ))
           ) : visible.length === 0 ? (
             <div className="py-16 text-center">
-              <p className="text-muted-foreground text-lg">
-                {search ? 'No posts match your search.' : 'No posts yet. Be the first to share!'}
-              </p>
+              <p className="text-muted-foreground text-lg">No posts yet. Be the first to share!</p>
             </div>
           ) : (
             <>
@@ -143,7 +153,6 @@ const Index = () => {
         </div>
       </main>
 
-      {/* Floating Create Button - visible to all */}
       <div className="fixed bottom-6 right-6 z-50">
         <CreateContentChooser onPostCreated={fetchPosts} />
       </div>
