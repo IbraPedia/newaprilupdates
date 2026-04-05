@@ -33,6 +33,7 @@ interface Post {
   category?: string;
   status?: string;
   type?: string;
+  impressions?: number;
 }
 
 interface Comment {
