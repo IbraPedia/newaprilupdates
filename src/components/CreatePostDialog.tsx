@@ -3,12 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { uploadFile, compressImage } from '@/lib/supabaseStorage';
 import { containsMiddleFinger, suspendUserForEmoji, checkSuspension } from '@/lib/moderation';
+import { useDraft } from '@/hooks/useDraft';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ImagePlus, X } from 'lucide-react';
+import { ImagePlus, X, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES } from '@/lib/categories';
 
@@ -36,6 +37,15 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
   const isControlled = externalOpen !== undefined;
   const isOpen = isControlled ? externalOpen : open;
   const setIsOpen = isControlled ? (v: boolean) => onExternalOpenChange?.(v) : setOpen;
+
+  const { debouncedSave, deleteDraft, saving, lastSaved } = useDraft();
+
+  // Auto-save on content changes
+  useEffect(() => {
+    if (isOpen && user) {
+      debouncedSave({ title: postTitle, content, category });
+    }
+  }, [postTitle, content, category, isOpen]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -93,6 +103,9 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
       } as any);
       if (error) throw error;
 
+      // Delete draft after successful publish
+      await deleteDraft();
+
       if (hasMedia) {
         toast.success('Post submitted! Visible after admin approval.');
       } else {
@@ -113,7 +126,15 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle style={{ fontFamily: 'var(--font-heading)' }}>Create a Post</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle style={{ fontFamily: 'var(--font-heading)' }}>Create a Post</DialogTitle>
+            {lastSaved && (
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Save className="h-3 w-3" />
+                {saving ? 'Saving...' : 'Draft saved'}
+              </p>
+            )}
+          </div>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <Input
@@ -148,11 +169,11 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory, externalOpen, onExte
           {previews.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
               {previews.map((src, i) => (
-                <div key={i} className="relative group rounded-lg overflow-hidden border">
+                <div key={i} className="relative group rounded-lg overflow-hidden border aspect-square">
                   {images[i]?.type.startsWith('video/') ? (
-                    <video src={src} className="w-full h-32 object-cover" preload="metadata" />
+                    <video src={src} className="w-full h-full object-cover" preload="metadata" />
                   ) : (
-                    <img src={src} alt="" className="w-full h-32 object-cover" />
+                    <img src={src} alt="" className="w-full h-full object-cover" />
                   )}
                   <button type="button" onClick={() => removeImage(i)}
                     className="absolute top-1 right-1 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">

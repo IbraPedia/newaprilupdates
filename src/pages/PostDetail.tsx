@@ -23,7 +23,7 @@ const PostDetail = () => {
     if (!id) return;
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, content, created_at, image_urls, category, status, author_id, type')
+      .select('id, title, content, created_at, image_urls, category, status, author_id, type, impressions')
       .eq('id', id)
       .single();
 
