@@ -563,29 +563,42 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
                 {previewVideoUrls.length > 0 && (
                   <div className="mt-1">
                     {previewVideoUrls.map((url, index) => (
-                      <video
+                      <div
                         key={`vid-${index}`}
-                        src={url}
-                        controls
-                        preload="metadata"
-                        playsInline
-                        className="w-full rounded-lg max-h-48 border bg-black"
-                      />
+                        className="relative aspect-square w-full rounded-lg border overflow-hidden bg-black cursor-pointer group"
+                        onClick={() => setViewerMedia({ url, isVideo: true })}
+                      >
+                        <video
+                          src={url}
+                          preload="metadata"
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                          <div className="bg-background/80 rounded-full p-3">
+                            <Play className="h-6 w-6 text-foreground fill-current" />
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
                 {previewImageUrls.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid gap-2 ${previewImageUrls.length === 1 ? 'grid-cols-1' : previewImageUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
                     {previewImageUrls.map((url, index) => (
-                      <img
+                      <div
                         key={`${url}-${index}`}
-                        src={url}
-                        alt="Post preview thumbnail"
-                        className="h-20 w-full rounded-md border object-cover"
-                        loading="lazy"
-                        width={96}
-                        height={80}
-                      />
+                        className="aspect-square rounded-lg border overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setViewerMedia({ url, isVideo: false })}
+                      >
+                        <img
+                          src={url}
+                          alt="Post preview"
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
