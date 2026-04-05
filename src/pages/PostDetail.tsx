@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRecordImpression } from '@/hooks/useImpressions';
 import Navbar from '@/components/Navbar';
 import PostCard from '@/components/PostCard';
 import GuestLoginPrompt from '@/components/GuestLoginPrompt';
