@@ -41,11 +41,13 @@ export const useRecordImpressionsBatch = (postIds: string[]) => {
     const sessionId = getSessionId();
     newIds.forEach(id => {
       recorded.current.add(id);
-      supabase.rpc('record_impression', {
-        p_post_id: id,
-        p_viewer_id: user?.id || null,
-        p_session_id: user ? null : sessionId,
-      } as any).then(() => {}).catch(() => {});
+      Promise.resolve(
+        supabase.rpc('record_impression', {
+          p_post_id: id,
+          p_viewer_id: user?.id || null,
+          p_session_id: user ? null : sessionId,
+        } as any)
+      ).catch(() => {});
     });
   }, [postIds, user]);
 };
