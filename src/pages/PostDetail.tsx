@@ -17,6 +17,7 @@ const PostDetail = () => {
   const [loading, setLoading] = useState(true);
 
   const autoShowComments = location.hash === '#comments';
+  useRecordImpression(id);
 
   const fetchPost = useCallback(async () => {
     if (!id) return;
