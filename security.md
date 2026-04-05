@@ -128,3 +128,21 @@ The application follows security best practices:
 3. **Enable leaked password protection** in Supabase dashboard (warning from linter — low priority since app uses OTP, not passwords)
 4. **Add storage RLS policies** to restrict who can upload to buckets (currently relies on client-side checks)
 5. **Consider rate limiting** on post/comment creation to prevent spam
+
+---
+
+## 10. Impressions System Security (Added 2026-04-05)
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Impression counting uses `SECURITY DEFINER` function with 1-hour rate limiting per viewer/session | ✅ OK | Prevents inflation |
+| `post_impressions` INSERT policy is `WITH CHECK (true)` — direct inserts allowed | ⚠️ Low | Mitigated: direct inserts don't increment post counter; only `record_impression()` does |
+| Session IDs generated client-side via `crypto.randomUUID()` | ✅ OK | Sufficient for rate limiting, not security-critical |
+| Raw impression data only readable by admins | ✅ OK | Prevents data scraping |
+
+### Anti-Bot Recommendations
+1. **Enable Supabase rate limiting** on the API level (Supabase dashboard → API settings) to limit requests per IP
+2. **Consider Cloudflare Bot Management** or similar WAF if deployed via Vercel/Cloudflare for DDoS and automated request protection
+3. **Add CAPTCHA** on auth forms (Supabase supports hCaptcha/Turnstile) to prevent automated account creation
+4. **Monitor `post_impressions` table size** — consider periodic cleanup of records older than 24h via a scheduled edge function
+5. **IP-based rate limiting** at the edge (Vercel Edge Middleware or Cloudflare Rules) for API endpoints
