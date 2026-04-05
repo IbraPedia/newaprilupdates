@@ -46,6 +46,7 @@ const PostDetail = () => {
       ...data,
       author: author || { id: (data as any).author_id, username: 'Unknown user', is_verified: false, avatar_url: null },
       image_urls: (data as any).image_urls || [],
+      impressions: (data as any).impressions || 0,
       likes_count: likesData?.length || 0,
       comments_count: commentsData?.length || 0,
       user_liked: user ? likesData?.some(l => l.user_id === user.id) || false : false,
