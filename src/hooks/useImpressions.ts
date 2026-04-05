@@ -20,11 +20,13 @@ export const useRecordImpression = (postId: string | undefined) => {
     recorded.current.add(postId);
 
     const sessionId = getSessionId();
-    supabase.rpc('record_impression', {
-      p_post_id: postId,
-      p_viewer_id: user?.id || null,
-      p_session_id: user ? null : sessionId,
-    } as any).then(() => {}).catch(() => {});
+    Promise.resolve(
+      supabase.rpc('record_impression', {
+        p_post_id: postId,
+        p_viewer_id: user?.id || null,
+        p_session_id: user ? null : sessionId,
+      } as any)
+    ).catch(() => {});
   }, [postId, user]);
 };
 
