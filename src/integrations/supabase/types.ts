@@ -254,6 +254,30 @@ export type Database = {
           },
         ]
       }
+      post_impressions: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          session_id: string | null
+          viewer_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          session_id?: string | null
+          viewer_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          session_id?: string | null
+          viewer_id?: string | null
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           author_id: string
@@ -262,6 +286,7 @@ export type Database = {
           created_at: string
           id: string
           image_urls: string[] | null
+          impressions: number
           status: string
           title: string
           type: string
@@ -274,6 +299,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_urls?: string[] | null
+          impressions?: number
           status?: string
           title: string
           type?: string
@@ -286,6 +312,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_urls?: string[] | null
+          impressions?: number
           status?: string
           title?: string
           type?: string
@@ -489,6 +516,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      record_impression: {
+        Args: { p_post_id: string; p_session_id?: string; p_viewer_id?: string }
+        Returns: undefined
       }
     }
     Enums: {

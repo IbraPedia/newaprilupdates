@@ -5,13 +5,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { useModRole } from '@/hooks/useModRole';
 import { uploadFile, compressImage } from '@/lib/supabaseStorage';
 import { containsMiddleFinger, suspendUserForEmoji, checkSuspension } from '@/lib/moderation';
+import { formatCompactNumber } from '@/lib/formatNumber';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, Share2, Send, Bookmark, BookmarkCheck, Pencil, Trash2, X, Check, Flag, Reply, ImagePlus, Video, BadgeCheck } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Heart, MessageCircle, Share2, Send, Bookmark, BookmarkCheck, Pencil, Trash2, X, Check, Flag, Reply, ImagePlus, Video, BadgeCheck, BarChart2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { CATEGORIES } from '@/lib/categories';
@@ -31,6 +33,7 @@ interface Post {
   category?: string;
   status?: string;
   type?: string;
+  impressions?: number;
 }
 
 interface Comment {
@@ -560,29 +563,42 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
                 {previewVideoUrls.length > 0 && (
                   <div className="mt-1">
                     {previewVideoUrls.map((url, index) => (
-                      <video
+                      <div
                         key={`vid-${index}`}
-                        src={url}
-                        controls
-                        preload="metadata"
-                        playsInline
-                        className="w-full rounded-lg max-h-48 border bg-black"
-                      />
+                        className="relative aspect-square w-full rounded-lg border overflow-hidden bg-black cursor-pointer group"
+                        onClick={() => setViewerMedia({ url, isVideo: true })}
+                      >
+                        <video
+                          src={url}
+                          preload="metadata"
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                          <div className="bg-background/80 rounded-full p-3">
+                            <Play className="h-6 w-6 text-foreground fill-current" />
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
                 {previewImageUrls.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid gap-2 ${previewImageUrls.length === 1 ? 'grid-cols-1' : previewImageUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
                     {previewImageUrls.map((url, index) => (
-                      <img
+                      <div
                         key={`${url}-${index}`}
-                        src={url}
-                        alt="Post preview thumbnail"
-                        className="h-20 w-full rounded-md border object-cover"
-                        loading="lazy"
-                        width={96}
-                        height={80}
-                      />
+                        className="aspect-square rounded-lg border overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setViewerMedia({ url, isVideo: false })}
+                      >
+                        <img
+                          src={url}
+                          alt="Post preview"
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
@@ -599,18 +615,33 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
           <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {post.image_urls.map((url, i) =>
               isMediaVideo(url) ? (
-                <video
-                  key={i} src={url} controls preload="metadata" playsInline
-                  className="w-full rounded-lg max-h-64 border cursor-pointer bg-black"
-                  onClick={(e) => { e.preventDefault(); setViewerMedia({ url, isVideo: true }); }}
-                />
+                <div
+                  key={i}
+                  className="relative aspect-square rounded-lg border overflow-hidden bg-black cursor-pointer group"
+                  onClick={() => setViewerMedia({ url, isVideo: true })}
+                >
+                  <video
+                    src={url} preload="metadata" playsInline muted
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                    <div className="bg-background/80 rounded-full p-3">
+                      <Play className="h-6 w-6 text-foreground fill-current" />
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <img
-                  key={i} src={url} alt=""
-                  className="w-full rounded-lg object-cover max-h-64 border cursor-pointer hover:opacity-90 transition-opacity"
-                  loading="lazy"
+                <div
+                  key={i}
+                  className="aspect-square rounded-lg border overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={() => setViewerMedia({ url, isVideo: false })}
-                />
+                >
+                  <img
+                    src={url} alt=""
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
               )
             )}
           </div>
@@ -623,6 +654,17 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
           <Button variant="ghost" size="sm" onClick={() => setShowComments(!showComments)} className="gap-1.5">
             <MessageCircle className="h-4 w-4" /> {post.comments_count}
           </Button>
+          {(post.impressions || 0) >= 10 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-muted-foreground text-sm px-2 py-1">
+                  <BarChart2 className="h-4 w-4" />
+                  <span>{formatCompactNumber(post.impressions || 0)}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Impressions: Total views of this post</TooltipContent>
+            </Tooltip>
+          )}
           <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1.5">
             <Share2 className="h-4 w-4" />
           </Button>

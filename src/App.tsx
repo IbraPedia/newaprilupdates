@@ -20,6 +20,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Moderation = lazy(() => import("./pages/Moderation"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const CreateThread = lazy(() => import("./pages/CreateThread"));
+const SearchResults = lazy(() => import("./pages/SearchResults"));
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
                   <Route path="/moderation" element={<Moderation />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/create-thread" element={<CreateThread />} />
+                  <Route path="/search" element={<SearchResults />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>

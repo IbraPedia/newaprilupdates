@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRecordImpression } from '@/hooks/useImpressions';
 import Navbar from '@/components/Navbar';
 import PostCard from '@/components/PostCard';
 import GuestLoginPrompt from '@/components/GuestLoginPrompt';
@@ -16,12 +17,13 @@ const PostDetail = () => {
   const [loading, setLoading] = useState(true);
 
   const autoShowComments = location.hash === '#comments';
+  useRecordImpression(id);
 
   const fetchPost = useCallback(async () => {
     if (!id) return;
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, content, created_at, image_urls, category, status, author_id, type')
+      .select('id, title, content, created_at, image_urls, category, status, author_id, type, impressions')
       .eq('id', id)
       .single();
 
@@ -44,6 +46,7 @@ const PostDetail = () => {
       ...data,
       author: author || { id: (data as any).author_id, username: 'Unknown user', is_verified: false, avatar_url: null },
       image_urls: (data as any).image_urls || [],
+      impressions: (data as any).impressions || 0,
       likes_count: likesData?.length || 0,
       comments_count: commentsData?.length || 0,
       user_liked: user ? likesData?.some(l => l.user_id === user.id) || false : false,
