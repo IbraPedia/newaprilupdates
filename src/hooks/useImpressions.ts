@@ -43,7 +43,7 @@ export const useRecordImpressionsBatch = (postIds: string[]) => {
         p_post_id: id,
         p_viewer_id: user?.id || null,
         p_session_id: user ? null : sessionId,
-      }).catch(() => {});
+      } as any).then(() => {}).catch(() => {});
     });
   }, [postIds, user]);
 };
