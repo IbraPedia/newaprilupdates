@@ -24,7 +24,7 @@ export const useRecordImpression = (postId: string | undefined) => {
       p_post_id: postId,
       p_viewer_id: user?.id || null,
       p_session_id: user ? null : sessionId,
-    }).catch(() => {});
+    } as any).then(() => {}).catch(() => {});
   }, [postId, user]);
 };
 
