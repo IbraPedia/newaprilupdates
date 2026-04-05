@@ -639,6 +639,17 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
           <Button variant="ghost" size="sm" onClick={() => setShowComments(!showComments)} className="gap-1.5">
             <MessageCircle className="h-4 w-4" /> {post.comments_count}
           </Button>
+          {(post.impressions || 0) >= 10 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-muted-foreground text-sm px-2 py-1">
+                  <BarChart2 className="h-4 w-4" />
+                  <span>{formatCompactNumber(post.impressions || 0)}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Impressions: Total views of this post</TooltipContent>
+            </Tooltip>
+          )}
           <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1.5">
             <Share2 className="h-4 w-4" />
           </Button>
